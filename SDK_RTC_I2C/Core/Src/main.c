@@ -19,16 +19,13 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
-#include "i2c.h"
-//#include "rtc.h"
+#include "iwdg.h"
 #include "gpio.h"
-#include "stdio.h"
-#include "string.h"
+#include "mcp.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include "trace.h"
-
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -48,8 +45,6 @@
 /* Private variables ---------------------------------------------------------*/
 
 /* USER CODE BEGIN PV */
-  RTC_TimeTypeDef sTime = {0};
-  RTC_DateTypeDef sDate = {0};
 
 /* USER CODE END PV */
 
@@ -93,55 +88,63 @@ int main(void)
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
   MX_IWDG_Init();
-//  MX_RTC_Init();
-  MX_I2C1_Init();
+  MX_MCP_Init();
   /* USER CODE BEGIN 2 */
 
   /* Do not remove this code below */
   MX_TRACE_Init();
   SDK_TRACE_Start();
   /* Do not remove this code from above */
+  HAL_StatusTypeDef i2cStatus;
+  RTC_TimeTypeDef sTime = {0};
+  RTC_DateTypeDef sDate = {0};
 
-  SDK_TRACE_Print("%s","Test string");
-//  __HAL_RTC_WRITEPROTECTION_DISABLE(&hrtc);
-//  HAL_RTC_WaitForSynchro(&hrtc);
-  SDK_TRACE_Timestamp(PRINT, 0);
-////  HAL_RTC_GetDate(&hrtc, &sDate, RTC_FORMAT_BIN);
-////  SDK_TRACE_Print("Current Date: %02d-%02d-%02d\n", sDate.Date, sDate.Month, sDate.Year);
-//  HAL_RTC_GetDate(&hrtc, &sDate, RTC_FORMAT_BIN);
-//  	  SDK_TRACE_Print("Current Date: %02d-%02d-%02d\n", sDate.Date, sDate.Month, sDate.Year);
+  // Получение текущей даты и времени (замените это на реальное получение времени и даты)
+  sTime.Hours = 21;        // Часы (от 0 до 23)
+  sTime.Minutes = 35;      // Минуты (от 0 до 59)
+  sTime.Seconds = 30;      // Секунды (от 0 до 59)
+  sTime.TimeFormat = RTC_HOURFORMAT_24; // Формат времени (12-часовой AM)
 
-  for (int i = 0; i < 5;i++) {
-//	 SDK_TRACE_Print("%d", sTime.Seconds);
-	 uint8_t rxData[7];  // MCP79411 RTC возвращает 7 байтов данных.
-	 HAL_StatusTypeDef i2cStatus;
+  sDate.WeekDay = RTC_WEEKDAY_SUNDAY; // День недели (понедельник)
+  sDate.Date = 21;       // День месяца (от 1 до 31)
+  sDate.Month = 10;      // Месяц (от 1 до 12)
+  sDate.Year = 23;       // Год (последние две цифры)
 
-	 // Адрес MCP79411 RTC на шине I2C.
-	 uint8_t rtcAddress = 0xDF; // MCP79411 RTC адрес в режиме чтения.
+  i2cStatus = setDateTime(&sTime, &sDate);
+  if (i2cStatus != HAL_OK){
+  		  Error_Handler();
+	}
 
-	 // Установка адреса чтения и начало чтения данных.
-	 i2cStatus = HAL_I2C_Mem_Read(&hi2c1, rtcAddress, 0x00, I2C_MEMADD_SIZE_8BIT, rxData, sizeof(rxData), HAL_MAX_DELAY);
-
-	 if (i2cStatus == HAL_OK) {
-		 // Вывод данных времени и даты в консоль.
-		 uint8_t seconds = (rxData[0] & 0x0F);
-		 uint8_t minutes = (rxData[1] & 0x0F);
-		 uint8_t hours = (rxData[2] & 0x0F);
-		 uint8_t day = (rxData[3] & 0x07);
-		 uint8_t date = (rxData[4] & 0x0F);
-		 uint8_t month = (rxData[5] & 0x0F);
-		 uint16_t year = (2000 + ((rxData[6] & 0x0F)));
-		 SDK_TRACE_Print("Дата и время: %02d:%02d:%02d %02d/%02d/%04d\n", hours, minutes, seconds, date, month, year);
-	 }
-	 else{
-		Error_Handler();
-	 }
-	 SDK_TRACE_Timestamp(PRINT, 0);
-//	 SDK_TRACE_Print("Current Time: %02d:%02d:%02d.%03d\n", sTime.Hours, sTime.Minutes, sTime.Seconds, sTime.SubSeconds);
-	 HAL_Delay(1000);
-
+  i2cStatus = getDate(&sDate);
+  if (i2cStatus == HAL_OK){
+	  SDK_TRACE_Print("Дата:%02d/%02d/%04d\n", sDate.Date, sDate.Month, sDate.Year);
   }
-//  SDK_TRACE_Timestamp(PRINT, 0);
+  else {
+	  Error_Handler();
+  }
+
+
+  for(int i=0; i<8; i++){
+	  HAL_Delay(1000);
+	  i2cStatus = getTime(&sTime);
+	  if (i2cStatus == HAL_OK){
+		  SDK_TRACE_Print("Время: %02d:%02d:%02d\n", sTime.Hours, sTime.Minutes, sTime.Seconds);
+	  }
+	  else {
+		  Error_Handler();
+	  }
+	  i2cStatus = getDateTime(&sTime, &sDate);
+	  if (i2cStatus == HAL_OK){
+		  SDK_TRACE_Print("Время и дата: %02d:%02d:%02d %02d/%02d/%04d\n", sTime.Hours, sTime.Minutes, sTime.Seconds, sDate.Date, sDate.Month, sDate.Year);
+	  }
+	  else {
+	  		  Error_Handler();
+	  	  }
+	  SDK_TRACE_Timestamp(PRINT, 0);
+  }
+
+
+
   /* Place your code before here */
   /* Do not remove this code below */
   SDK_TRACE_Stop();
@@ -168,39 +171,37 @@ void SystemClock_Config(void)
 {
   RCC_OscInitTypeDef RCC_OscInitStruct = {0};
   RCC_ClkInitTypeDef RCC_ClkInitStruct = {0};
-  RCC_PeriphCLKInitTypeDef PeriphClkInitStruct = {0};
 
   /** Configure the main internal regulator output voltage
   */
   __HAL_RCC_PWR_CLK_ENABLE();
   __HAL_PWR_VOLTAGESCALING_CONFIG(PWR_REGULATOR_VOLTAGE_SCALE1);
-  /** Initializes the CPU, AHB and APB busses clocks
+  /** Initializes the RCC Oscillators according to the specified parameters
+  * in the RCC_OscInitTypeDef structure.
   */
-  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSI|RCC_OSCILLATORTYPE_LSI;
-  RCC_OscInitStruct.HSIState = RCC_HSI_ON;
-  RCC_OscInitStruct.HSICalibrationValue = RCC_HSICALIBRATION_DEFAULT;
+  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_LSI|RCC_OSCILLATORTYPE_HSE;
+  RCC_OscInitStruct.HSEState = RCC_HSE_ON;
   RCC_OscInitStruct.LSIState = RCC_LSI_ON;
-  RCC_OscInitStruct.PLL.PLLState = RCC_PLL_NONE;
+  RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
+  RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSE;
+  RCC_OscInitStruct.PLL.PLLM = 25;
+  RCC_OscInitStruct.PLL.PLLN = 336;
+  RCC_OscInitStruct.PLL.PLLP = RCC_PLLP_DIV2;
+  RCC_OscInitStruct.PLL.PLLQ = 4;
   if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)
   {
     Error_Handler();
   }
-  /** Initializes the CPU, AHB and APB busses clocks
+  /** Initializes the CPU, AHB and APB buses clocks
   */
   RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK|RCC_CLOCKTYPE_SYSCLK
                               |RCC_CLOCKTYPE_PCLK1|RCC_CLOCKTYPE_PCLK2;
-  RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_HSI;
+  RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_PLLCLK;
   RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV1;
-  RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV1;
-  RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV1;
+  RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV4;
+  RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV2;
 
-  if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_0) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  PeriphClkInitStruct.PeriphClockSelection = RCC_PERIPHCLK_RTC;
-  PeriphClkInitStruct.RTCClockSelection = RCC_RTCCLKSOURCE_LSI;
-  if (HAL_RCCEx_PeriphCLKConfig(&PeriphClkInitStruct) != HAL_OK)
+  if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_5) != HAL_OK)
   {
     Error_Handler();
   }
