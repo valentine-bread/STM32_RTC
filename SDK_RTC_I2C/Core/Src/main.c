@@ -22,6 +22,7 @@
 #include "iwdg.h"
 #include "gpio.h"
 #include "mcp.h"
+#include "i2c.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
@@ -63,6 +64,23 @@ void SystemClock_Config(void);
   * @brief  The application entry point.
   * @retval int
   */
+HAL_StatusTypeDef setCurrentDateTime(void){
+  RTC_TimeTypeDef sTime = {0};
+  RTC_DateTypeDef sDate = {0};
+   //Получение текущей даты и времени (замените это на реальное получение времени и даты)
+  sTime.Hours = 23;        // Часы (от 0 до 23)
+  sTime.Minutes = 39;      // Минуты (от 0 до 59)
+  sTime.Seconds = 30;      // Секунды (от 0 до 59)
+  sTime.TimeFormat = RTC_HOURFORMAT_24; // Формат времени (12-часовой AM)
+
+  sDate.WeekDay = RTC_WEEKDAY_SUNDAY; // День недели (понедельник)
+  sDate.Date = 22;       // День месяца (от 1 до 31)
+  sDate.Month = 10;      // Месяц (от 1 до 12)
+  sDate.Year = 23;       // Год (последние две цифры)
+
+  return setDateTime(&sTime, &sDate);
+}
+
 int main(void)
 {
   /* USER CODE BEGIN 1 */
@@ -89,6 +107,7 @@ int main(void)
   MX_GPIO_Init();
   MX_IWDG_Init();
   MX_MCP_Init();
+  MX_I2C1_Init();
   /* USER CODE BEGIN 2 */
 
   /* Do not remove this code below */
@@ -99,51 +118,21 @@ int main(void)
   RTC_TimeTypeDef sTime = {0};
   RTC_DateTypeDef sDate = {0};
 
-  // Получение текущей даты и времени (замените это на реальное получение времени и даты)
-  sTime.Hours = 21;        // Часы (от 0 до 23)
-  sTime.Minutes = 35;      // Минуты (от 0 до 59)
-  sTime.Seconds = 30;      // Секунды (от 0 до 59)
-  sTime.TimeFormat = RTC_HOURFORMAT_24; // Формат времени (12-часовой AM)
+//  if (setCurrentDateTime() != HAL_OK){
+//	  Error_Handler();
+//  }
 
-  sDate.WeekDay = RTC_WEEKDAY_SUNDAY; // День недели (понедельник)
-  sDate.Date = 21;       // День месяца (от 1 до 31)
-  sDate.Month = 10;      // Месяц (от 1 до 12)
-  sDate.Year = 23;       // Год (последние две цифры)
-
-  i2cStatus = setDateTime(&sTime, &sDate);
-  if (i2cStatus != HAL_OK){
-  		  Error_Handler();
-	}
-
-  i2cStatus = getDate(&sDate);
-  if (i2cStatus == HAL_OK){
-	  SDK_TRACE_Print("Дата:%02d/%02d/%04d\n", sDate.Date, sDate.Month, sDate.Year);
-  }
-  else {
-	  Error_Handler();
-  }
-
-
-  for(int i=0; i<8; i++){
+  for(int i=0; i<6; i++){
 	  HAL_Delay(1000);
-	  i2cStatus = getTime(&sTime);
-	  if (i2cStatus == HAL_OK){
-		  SDK_TRACE_Print("Время: %02d:%02d:%02d\n", sTime.Hours, sTime.Minutes, sTime.Seconds);
-	  }
-	  else {
-		  Error_Handler();
-	  }
 	  i2cStatus = getDateTime(&sTime, &sDate);
 	  if (i2cStatus == HAL_OK){
-		  SDK_TRACE_Print("Время и дата: %02d:%02d:%02d %02d/%02d/%04d\n", sTime.Hours, sTime.Minutes, sTime.Seconds, sDate.Date, sDate.Month, sDate.Year);
+		  SDK_TRACE_Print("Время и дата: %02d:%02d:%02d %02d/%02d/%02d\n", sTime.Hours, sTime.Minutes, sTime.Seconds, sDate.Date, sDate.Month, sDate.Year);
 	  }
 	  else {
 	  		  Error_Handler();
 	  	  }
 	  SDK_TRACE_Timestamp(PRINT, 0);
   }
-
-
 
   /* Place your code before here */
   /* Do not remove this code below */
@@ -176,12 +165,10 @@ void SystemClock_Config(void)
   */
   __HAL_RCC_PWR_CLK_ENABLE();
   __HAL_PWR_VOLTAGESCALING_CONFIG(PWR_REGULATOR_VOLTAGE_SCALE1);
-  /** Initializes the RCC Oscillators according to the specified parameters
-  * in the RCC_OscInitTypeDef structure.
+  /** Initializes the CPU, AHB and APB busses clocks
   */
-  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_LSI|RCC_OSCILLATORTYPE_HSE;
+  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSE;
   RCC_OscInitStruct.HSEState = RCC_HSE_ON;
-  RCC_OscInitStruct.LSIState = RCC_LSI_ON;
   RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
   RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSE;
   RCC_OscInitStruct.PLL.PLLM = 25;
@@ -192,7 +179,7 @@ void SystemClock_Config(void)
   {
     Error_Handler();
   }
-  /** Initializes the CPU, AHB and APB buses clocks
+  /** Initializes the CPU, AHB and APB busses clocks
   */
   RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK|RCC_CLOCKTYPE_SYSCLK
                               |RCC_CLOCKTYPE_PCLK1|RCC_CLOCKTYPE_PCLK2;
@@ -206,6 +193,7 @@ void SystemClock_Config(void)
     Error_Handler();
   }
 }
+
 
 /* USER CODE BEGIN 4 */
 
