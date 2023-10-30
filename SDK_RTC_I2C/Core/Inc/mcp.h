@@ -13,6 +13,7 @@
   ((byte) & 0x04 ? '1' : '0'), \
   ((byte) & 0x02 ? '1' : '0'), \
   ((byte) & 0x01 ? '1' : '0')
+
 #define rtcAddress 0xDF
 
 HAL_StatusTypeDef getDateTime(RTC_TimeTypeDef *sTime, RTC_DateTypeDef *sDate);

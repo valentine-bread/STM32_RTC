@@ -1,21 +1,24 @@
 #include "mcp.h"
 #include "i2c.h"
 
+
+// This function initializes the MCP device.
 void MX_MCP_Init(void){
 
 }
 
+// This function reads data from the MCP device using the I2C interface.
 HAL_StatusTypeDef readMCP(uint8_t *rxData, uint16_t Size, uint16_t MemAddress){
 	return HAL_I2C_Mem_Read(&hi2c1, rtcAddress | 1, MemAddress, I2C_MEMADD_SIZE_8BIT, rxData, Size, HAL_MAX_DELAY);
 }
 
+// This function writes data to the MCP device using the I2C interface.
 HAL_StatusTypeDef writeMCP(uint8_t *rxData, uint16_t Size, uint16_t MemAddress){
 	return HAL_I2C_Mem_Write(&hi2c1,rtcAddress & 0xFFFE, MemAddress, I2C_MEMADD_SIZE_8BIT, rxData, Size, HAL_MAX_DELAY);
 }
 
-
+// This function extracts the hour value from the register value of the MCP device
 uint8_t extractHours(uint8_t registerValue) {
-    // Извлекаем значения битов 12/24, AM/PM, HRTEN0, HRTEN<1:0> и HRONE<3:0>
     uint8_t format12_24 = (registerValue >> 6) & 0x01;  // 12/24 (бит 6)
     uint8_t am_pm = (registerValue >> 5) & 0x01;       // AM/PM (бит 5)
     uint8_t tens = 0;
@@ -38,7 +41,7 @@ uint8_t extractHours(uint8_t registerValue) {
     return hours;
 }
 
-
+// This function extracts the month value from the register value of the MCP device.
 uint8_t extractMonth(uint8_t registerValue) {
     // Извлекаем значения битов LPYR, MTHTEN0 и MTHONE3-0
     uint8_t isLeapYear = (registerValue >> 5) & 0x01;  // LPYR (бит 5)
@@ -53,7 +56,7 @@ uint8_t extractMonth(uint8_t registerValue) {
     return month;
 }
 
-
+// This function retrieves the current date and time from the MCP device.
 HAL_StatusTypeDef getDateTime(RTC_TimeTypeDef *sTime, RTC_DateTypeDef *sDate){
 	uint8_t rxData[7];  // MCP79411 RTC возвращает 7 байтов данных.
 	HAL_StatusTypeDef i2cStatus;
@@ -71,12 +74,14 @@ HAL_StatusTypeDef getDateTime(RTC_TimeTypeDef *sTime, RTC_DateTypeDef *sDate){
 	return i2cStatus;
 }
 
-
+// This function converts a decimal value to binary-coded decimal (BCD) format.
 uint8_t decToBcd(uint8_t val){
   return (val / 10) << 4 | (val % 10);
 //	return (uint8_t)( (val/10*16) + (val%10) );
 }
 
+
+// This function forms the date and time data to be written to the MCP device.
 void formDateTimeData(uint8_t* data, RTC_TimeTypeDef *sTime, RTC_DateTypeDef *sDate) {
     // Формирование данных времени
     data[0] = decToBcd(sTime->Seconds);
@@ -103,6 +108,8 @@ void formDateTimeData(uint8_t* data, RTC_TimeTypeDef *sTime, RTC_DateTypeDef *sD
     data[6] = decToBcd(sDate->Year);
 }
 
+
+// This function sets the ST (Start) bit of the MCP device.
 HAL_StatusTypeDef setSTBit() {
     uint8_t rxData[1];
     HAL_StatusTypeDef i2cStatus;
@@ -114,6 +121,7 @@ HAL_StatusTypeDef setSTBit() {
     return writeMCP(rxData, 1, 0x00); // Запись обновленного значения обратно в устройство
 }
 
+// This function clears the ST (Start) bit of the MCP device.
 HAL_StatusTypeDef clearSTBit() {
     uint8_t rxData[1];
     HAL_StatusTypeDef i2cStatus;
@@ -125,6 +133,7 @@ HAL_StatusTypeDef clearSTBit() {
     return writeMCP(rxData, 1, 0x00);    // Запись обновленного значения обратно в устройство
 }
 
+// This function reads the OSCRUN bit from the MCP device.
 uint8_t readOSCRUNBit() {
     uint8_t rxData[1];
     if (readMCP(rxData, 1, 0x03) != HAL_OK) {    // Чтение значения регистра RTCWKDAY
@@ -134,7 +143,7 @@ uint8_t readOSCRUNBit() {
     return OSCRUNBit;
 }
 
-
+// This function clears the EXTOSC bit of the MCP device.
 HAL_StatusTypeDef clearEXTOSCBit() {
 	uint8_t rxData[1];
 	HAL_StatusTypeDef i2cStatus;
@@ -146,7 +155,7 @@ HAL_StatusTypeDef clearEXTOSCBit() {
 	return writeMCP(rxData, 1, 0x07);    // Запись обновленного значения обратно в устройство
 }
 
-
+// This function sets the date and time on the MCP device.
 HAL_StatusTypeDef setDateTime(RTC_TimeTypeDef *sTime, RTC_DateTypeDef *sDate){
 	HAL_StatusTypeDef i2cStatus = clearSTBit();
 	if(i2cStatus != HAL_OK){
@@ -159,7 +168,7 @@ HAL_StatusTypeDef setDateTime(RTC_TimeTypeDef *sTime, RTC_DateTypeDef *sDate){
 	for(int i = 0; i < 11 && readOSCRUNBit() != 0; i++){
 		HAL_Delay(10);
 		if(i == 10){
-//			return HAL_ERROR;
+			return HAL_ERROR;
 		}
 	}
 	uint8_t rxData[7];
